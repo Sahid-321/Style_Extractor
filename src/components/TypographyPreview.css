@@ -1,0 +1,138 @@
+.typography-preview {
+  margin: 20px 0;
+}
+
+.typography-preview h3 {
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.typography-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.typography-token {
+  background: white;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.typography-preview-text {
+  padding-right: 20px;
+  border-right: 1px solid #e1e5e9;
+}
+
+.typography-sample-sizes {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.typography-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.typography-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.typography-control-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.typography-control-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.typography-name-input,
+.typography-input {
+  padding: 8px 10px;
+  border: 1px solid #e1e5e9;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.typography-number-input {
+  padding: 6px 8px;
+  border: 1px solid #e1e5e9;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 70px;
+}
+
+.typography-select {
+  padding: 6px 8px;
+  border: 1px solid #e1e5e9;
+  border-radius: 4px;
+  font-size: 14px;
+  background: white;
+}
+
+.typography-color-input {
+  width: 40px;
+  height: 32px;
+  border: 1px solid #e1e5e9;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.unit {
+  font-size: 12px;
+  color: #6b7280;
+  margin-left: 4px;
+}
+
+.delete-typography-btn {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.delete-typography-btn:hover {
+  background: #dc2626;
+}
+
+@media (max-width: 768px) {
+  .typography-token {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .typography-preview-text {
+    padding-right: 0;
+    border-right: none;
+    border-bottom: 1px solid #e1e5e9;
+    padding-bottom: 16px;
+  }
+  
+  .typography-control-row {
+    grid-template-columns: 1fr;
+  }
+}
