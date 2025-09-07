@@ -47,11 +47,11 @@ export class ColorAnalyzer {
     });
   }
 
-  private static rgbToHex(r: number, g: number, b: number): string {
+  public static rgbToHex(r: number, g: number, b: number): string {
     return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
   }
 
-  private static hexToRgb(hex: string): { r: number; g: number; b: number } {
+  public static hexToRgb(hex: string): { r: number; g: number; b: number } {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
       r: parseInt(result[1], 16),
@@ -60,7 +60,7 @@ export class ColorAnalyzer {
     } : { r: 0, g: 0, b: 0 };
   }
 
-  private static rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
+  public static rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
     r /= 255;
     g /= 255;
     b /= 255;
@@ -91,7 +91,7 @@ export class ColorAnalyzer {
     };
   }
 
-  private static generateColorName(hex: string): string {
+  public static generateColorName(hex: string): string {
     const colorNames: { [key: string]: string } = {
       '#ffffff': 'white',
       '#000000': 'black',
@@ -129,7 +129,7 @@ export class ColorAnalyzer {
     return `${hueName}-${lightness}`;
   }
 
-  private static inferColorUsage(hex: string, frequency: number): ColorToken['usage'] {
+  public static inferColorUsage(hex: string, frequency: number): ColorToken['usage'] {
     const rgb = this.hexToRgb(hex);
     const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
 
@@ -152,31 +152,36 @@ export class ComponentDetector {
     const ctx = canvas.getContext('2d');
     if (!ctx) return [];
 
-    // This is a simplified component detection
-    // In a real implementation, you'd use more sophisticated computer vision
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const components: ComponentSpec[] = [];
     
-    // Simulate detecting rectangular components
-    const rects = this.findRectangularShapes(canvas);
+    // Advanced shape detection using edge detection
+    const shapes = this.detectShapesFromPixelData(imageData, canvas.width, canvas.height);
     
-    rects.forEach((rect, index) => {
+    shapes.forEach((shape, index) => {
+      const componentType = this.inferComponentType(shape);
+      const states = this.detectComponentStates(shape, imageData);
+      const colors = this.extractColorsFromRegion(shape, imageData, canvas.width);
+      const typography = this.detectTextInRegion(shape, imageData);
+      
       const component: ComponentSpec = {
-        id: `component-${index}`,
-        type: this.inferComponentType(rect),
-        name: `Component ${index + 1}`,
-        boundingBox: rect,
+        id: `${componentType}-${index}`,
+        type: componentType,
+        name: this.generateComponentName(componentType, index),
+        boundingBox: shape,
+        states: states,
         styles: {
-          colors: [],
-          typography: [],
-          spacing: [],
-          borders: [],
-          shadows: []
+          colors,
+          typography,
+          spacing: this.calculateSpacing(shape),
+          borders: this.detectBorders(shape, imageData, canvas.width),
+          shadows: this.detectShadows(shape, imageData, canvas.width)
         },
         measurements: {
-          width: rect.width,
-          height: rect.height,
-          padding: { top: 0, right: 0, bottom: 0, left: 0 },
-          margin: { top: 0, right: 0, bottom: 0, left: 0 }
+          width: shape.width,
+          height: shape.height,
+          padding: this.calculatePadding(shape, imageData, canvas.width),
+          margin: this.calculateMargin(shape, imageData, canvas.width)
         }
       };
       
@@ -186,39 +191,336 @@ export class ComponentDetector {
     return components;
   }
 
-  private static findRectangularShapes(canvas: HTMLCanvasElement): Array<{x: number, y: number, width: number, height: number}> {
-    // Simplified shape detection - in reality you'd use edge detection algorithms
-    const shapes = [];
-    const width = canvas.width;
-    const height = canvas.height;
+  private static detectShapesFromPixelData(
+    imageData: ImageData, 
+    width: number, 
+    height: number
+  ): Array<{x: number, y: number, width: number, height: number}> {
+    const shapes: Array<{x: number, y: number, width: number, height: number}> = [];
+    const pixels = imageData.data;
+    const visited = new Set<string>();
     
-    // Create some mock detected shapes
-    shapes.push({ x: 50, y: 50, width: 200, height: 40 }); // Button
-    shapes.push({ x: 50, y: 120, width: 300, height: 150 }); // Card
-    shapes.push({ x: 50, y: 300, width: 250, height: 30 }); // Input
+    // Edge detection using simplified Sobel operator
+    const edges = this.detectEdges(pixels, width, height);
+    
+    // Find connected components (rectangles)
+    for (let y = 0; y < height; y += 10) { // Sample every 10 pixels for performance
+      for (let x = 0; x < width; x += 10) {
+        const key = `${x},${y}`;
+        if (visited.has(key)) continue;
+        
+        const shape = this.findRectangularRegion(x, y, edges, width, height, visited);
+        if (shape && shape.width > 30 && shape.height > 20) { // Minimum size threshold
+          shapes.push(shape);
+        }
+      }
+    }
     
     return shapes;
   }
 
+  private static detectEdges(pixels: Uint8ClampedArray, width: number, height: number): boolean[] {
+    const edges = new Array(width * height).fill(false);
+    const threshold = 30;
+    
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const idx = (y * width + x) * 4;
+        const current = this.getGrayscale(pixels, idx);
+        
+        // Check surrounding pixels for significant changes
+        const neighbors = [
+          this.getGrayscale(pixels, ((y-1) * width + x) * 4),
+          this.getGrayscale(pixels, ((y+1) * width + x) * 4),
+          this.getGrayscale(pixels, (y * width + (x-1)) * 4),
+          this.getGrayscale(pixels, (y * width + (x+1)) * 4),
+        ];
+        
+        const maxDiff = Math.max(...neighbors.map(n => Math.abs(current - n)));
+        edges[y * width + x] = maxDiff > threshold;
+      }
+    }
+    
+    return edges;
+  }
+
+  private static getGrayscale(pixels: Uint8ClampedArray, idx: number): number {
+    return (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 3;
+  }
+
+  private static findRectangularRegion(
+    startX: number, 
+    startY: number, 
+    edges: boolean[], 
+    width: number, 
+    height: number, 
+    visited: Set<string>
+  ): {x: number, y: number, width: number, height: number} | null {
+    // Simplified rectangle detection
+    let minX = startX, maxX = startX;
+    let minY = startY, maxY = startY;
+    
+    // Expand region to find bounds
+    for (let expansion = 1; expansion < 100; expansion += 10) {
+      let foundEdge = false;
+      
+      // Check horizontal bounds
+      for (let x = Math.max(0, startX - expansion); x <= Math.min(width - 1, startX + expansion); x++) {
+        if (edges[startY * width + x]) {
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
+          foundEdge = true;
+        }
+      }
+      
+      // Check vertical bounds
+      for (let y = Math.max(0, startY - expansion); y <= Math.min(height - 1, startY + expansion); y++) {
+        if (edges[y * width + startX]) {
+          minY = Math.min(minY, y);
+          maxY = Math.max(maxY, y);
+          foundEdge = true;
+        }
+      }
+      
+      if (!foundEdge) break;
+    }
+    
+    const rectWidth = maxX - minX;
+    const rectHeight = maxY - minY;
+    
+    if (rectWidth < 30 || rectHeight < 20) return null;
+    
+    return { x: minX, y: minY, width: rectWidth, height: rectHeight };
+  }
+
   private static inferComponentType(rect: {x: number, y: number, width: number, height: number}): ComponentSpec['type'] {
     const aspectRatio = rect.width / rect.height;
+    const area = rect.width * rect.height;
     
-    // Button-like aspect ratio
-    if (aspectRatio > 2 && aspectRatio < 8 && rect.height < 60) {
+    // Navigation bars - wide and near top
+    if (rect.y < 100 && aspectRatio > 5 && rect.height < 80) {
+      return 'navbar';
+    }
+    
+    // Buttons - small rectangles with medium aspect ratio
+    if (aspectRatio > 2 && aspectRatio < 8 && rect.height < 60 && area < 15000) {
       return 'button';
     }
     
-    // Card-like aspect ratio
-    if (aspectRatio > 1.2 && aspectRatio < 3 && rect.height > 100) {
+    // Cards - larger rectangles, not too wide
+    if (aspectRatio > 0.8 && aspectRatio < 4 && rect.height > 80 && area > 10000) {
       return 'card';
     }
     
-    // Input-like aspect ratio
-    if (aspectRatio > 4 && rect.height < 50) {
+    // Inputs - very wide, short rectangles
+    if (aspectRatio > 4 && rect.height < 60) {
       return 'input';
     }
     
+    // Accordions - medium width, moderate height
+    if (aspectRatio > 1.5 && aspectRatio < 6 && rect.height > 40 && rect.height < 100) {
+      return 'accordion';
+    }
+    
+    // Breadcrumbs - wide, very short
+    if (aspectRatio > 6 && rect.height < 40) {
+      return 'breadcrumb';
+    }
+    
+    // Modals/dialogs - square-ish, large
+    if (aspectRatio > 0.5 && aspectRatio < 2 && area > 30000) {
+      return 'modal';
+    }
+    
+    // Lists - tall, narrow
+    if (aspectRatio < 1.5 && rect.height > 150) {
+      return 'list';
+    }
+    
     return 'other';
+  }
+
+  private static detectComponentStates(
+    rect: {x: number, y: number, width: number, height: number},
+    imageData: ImageData
+  ): ('default' | 'hover' | 'active' | 'disabled' | 'focus')[] {
+    const states: ('default' | 'hover' | 'active' | 'disabled' | 'focus')[] = ['default'];
+    
+    // Analyze colors to detect hover/active states
+    const colors = this.extractColorsFromRegion(rect, imageData, imageData.width);
+    const hasMultipleColors = colors.length > 2;
+    const hasBrightColors = colors.some(c => this.isLightColor(c.hex));
+    const hasDarkColors = colors.some(c => !this.isLightColor(c.hex));
+    
+    // If we have both light and dark variants, likely has states
+    if (hasMultipleColors && hasBrightColors && hasDarkColors) {
+      states.push('hover');
+      if (colors.length > 3) states.push('active');
+    }
+    
+    // Check for disabled state (low saturation colors)
+    const hasGrayColors = colors.some(c => this.isGrayColor(c.hex));
+    if (hasGrayColors) states.push('disabled');
+    
+    return states;
+  }
+
+  private static generateComponentName(type: ComponentSpec['type'], index: number): string {
+    const typeNames = {
+      button: 'Button',
+      card: 'Card',
+      input: 'Input Field',
+      navbar: 'Navigation Bar',
+      accordion: 'Accordion',
+      breadcrumb: 'Breadcrumb',
+      modal: 'Modal Dialog',
+      list: 'List Component',
+      other: 'Component'
+    };
+    
+    return `${typeNames[type] || 'Component'} ${index + 1}`;
+  }
+
+  // Helper methods for color analysis
+  private static isLightColor(hex: string): boolean {
+    const rgb = ColorAnalyzer.hexToRgb(hex);
+    const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+    return brightness > 128;
+  }
+
+  private static isGrayColor(hex: string): boolean {
+    const rgb = ColorAnalyzer.hexToRgb(hex);
+    const diff = Math.max(rgb.r, rgb.g, rgb.b) - Math.min(rgb.r, rgb.g, rgb.b);
+    return diff < 30; // Low color difference indicates gray
+  }
+
+  // Extract colors from specific region
+  private static extractColorsFromRegion(
+    rect: {x: number, y: number, width: number, height: number},
+    imageData: ImageData,
+    canvasWidth: number
+  ): ColorToken[] {
+    const pixels = imageData.data;
+    const colorMap = new Map<string, number>();
+    
+    for (let y = rect.y; y < rect.y + rect.height; y += 2) {
+      for (let x = rect.x; x < rect.x + rect.width; x += 2) {
+        const idx = (y * canvasWidth + x) * 4;
+        if (idx >= pixels.length - 3) continue;
+        
+        const r = pixels[idx];
+        const g = pixels[idx + 1];
+        const b = pixels[idx + 2];
+        const a = pixels[idx + 3];
+        
+        if (a < 128) continue; // Skip transparent
+        
+        const hex = ColorAnalyzer.rgbToHex(r, g, b);
+        colorMap.set(hex, (colorMap.get(hex) || 0) + 1);
+      }
+    }
+    
+    return Array.from(colorMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map((color, index) => {
+        const [hex, frequency] = color;
+        const rgb = ColorAnalyzer.hexToRgb(hex);
+        const hsl = ColorAnalyzer.rgbToHsl(rgb.r, rgb.g, rgb.b);
+        
+        return {
+          id: `color-${rect.x}-${rect.y}-${index}`,
+          name: ColorAnalyzer.generateColorName(hex),
+          hex,
+          rgb: `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`,
+          hsl: `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`,
+          usage: ColorAnalyzer.inferColorUsage(hex, frequency),
+          frequency
+        };
+      });
+  }
+
+  private static detectTextInRegion(
+    rect: {x: number, y: number, width: number, height: number},
+    imageData: ImageData
+  ): TypographyToken[] {
+    // Simplified text detection - in reality would use OCR
+    const textTokens: TypographyToken[] = [];
+    
+    // Estimate font size based on component height
+    let fontSize = 16;
+    if (rect.height < 30) fontSize = 12;
+    else if (rect.height < 50) fontSize = 16;
+    else if (rect.height > 80) fontSize = 24;
+    
+    textTokens.push({
+      id: `text-${rect.x}-${rect.y}`,
+      name: `Text in ${this.generateComponentName(this.inferComponentType(rect), 0)}`,
+      fontFamily: 'Inter, Arial, sans-serif',
+      fontSize,
+      fontWeight: rect.height < 40 ? 400 : 600,
+      lineHeight: Math.round(fontSize * 1.4),
+      letterSpacing: 0,
+      textAlign: 'left',
+      color: '#1f2937'
+    });
+    
+    return textTokens;
+  }
+
+  private static calculateSpacing(rect: {x: number, y: number, width: number, height: number}) {
+    return [
+      { id: `spacing-${rect.x}-${rect.y}`, name: 'Component Spacing', value: 16, unit: 'px' as const, type: 'padding' as const }
+    ];
+  }
+
+  private static detectBorders(
+    rect: {x: number, y: number, width: number, height: number},
+    imageData: ImageData,
+    canvasWidth: number
+  ) {
+    return [
+      { id: `border-${rect.x}-${rect.y}`, name: 'Component Border', width: 1, style: 'solid' as const, color: '#e5e7eb', radius: 8 }
+    ];
+  }
+
+  private static detectShadows(
+    rect: {x: number, y: number, width: number, height: number},
+    imageData: ImageData,
+    canvasWidth: number
+  ) {
+    return [
+      { id: `shadow-${rect.x}-${rect.y}`, name: 'Component Shadow', offsetX: 0, offsetY: 2, blurRadius: 4, spreadRadius: 0, color: 'rgba(0, 0, 0, 0.1)', type: 'box-shadow' as const }
+    ];
+  }
+
+  private static calculatePadding(
+    rect: {x: number, y: number, width: number, height: number},
+    imageData: ImageData,
+    canvasWidth: number
+  ) {
+    // Estimate padding based on component type and size
+    const componentType = this.inferComponentType(rect);
+    
+    switch (componentType) {
+      case 'button':
+        return { top: 12, right: 24, bottom: 12, left: 24 };
+      case 'card':
+        return { top: 24, right: 24, bottom: 24, left: 24 };
+      case 'input':
+        return { top: 8, right: 12, bottom: 8, left: 12 };
+      default:
+        return { top: 16, right: 16, bottom: 16, left: 16 };
+    }
+  }
+
+  private static calculateMargin(
+    rect: {x: number, y: number, width: number, height: number},
+    imageData: ImageData,
+    canvasWidth: number
+  ) {
+    // Estimate margins based on spacing to other components
+    return { top: 8, right: 8, bottom: 8, left: 8 };
   }
 }
 
