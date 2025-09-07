@@ -63,7 +63,7 @@ export interface ShadowToken {
 
 export interface ComponentSpec {
   id: string;
-  type: 'button' | 'card' | 'input' | 'accordion' | 'breadcrumb' | 'modal' | 'navbar' | 'other';
+  type: 'button' | 'card' | 'input' | 'accordion' | 'breadcrumb' | 'modal' | 'navbar' | 'list' | 'other';
   name: string;
   boundingBox: {
     x: number;
