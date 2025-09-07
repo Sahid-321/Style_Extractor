@@ -1,7 +1,11 @@
 {
   "name": "style-extractor",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "description": "A React-based application that extracts comprehensive style specifications from UI screenshots",
+  "homepage": "https://style-extractor-assignment.netlify.app",
+  "author": "Sahid Jamal",
+  "keywords": ["react", "design-system", "style-extraction", "ui-analysis", "typescript"],
   "dependencies": {
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.8.0",
@@ -26,7 +30,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "build:netlify": "CI=false npm run build",
+    "preview": "npx serve -s build"
   },
   "eslintConfig": {
     "extends": [
